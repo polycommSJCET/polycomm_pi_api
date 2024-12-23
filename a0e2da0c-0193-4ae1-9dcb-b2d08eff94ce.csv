@@ -1,0 +1,7 @@
+meeting_id,speaker,text,language,detected_language,translated_text
+a0e2da0c-0193-4ae1-9dcb-b2d08eff94ce,ALEN P AJI,ഹെലോ,ml-IN,ml,Hello
+meeting_id,speaker,text,language,detected_language,translated_text
+a0e2da0c-0193-4ae1-9dcb-b2d08eff94ce,ALEN P AJI,ഹെലോ.,ml-IN,ml,Hello.
+a0e2da0c-0193-4ae1-9dcb-b2d08eff94ce,ALEN P AJI,അല്ലല്ല,ml-IN,ml,Not at all
+a0e2da0c-0193-4ae1-9dcb-b2d08eff94ce,ALEN P AJI,ഹലോ ഹലോ,ml-IN,ml,Hello hello
+a0e2da0c-0193-4ae1-9dcb-b2d08eff94ce,ALEN P AJI,ഹലോ ഹലോ.,ml-IN,ml,Hello Hello.
