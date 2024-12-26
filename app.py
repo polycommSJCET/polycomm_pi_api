@@ -78,9 +78,10 @@ def translate_text():
     
 
 
-@app.route('/generate', methods=['GET'])
-def generate():
+@app.route('/generate/<meet_id>', methods=['GET'])
+def generate(meet_id):
 
+    print("meeting_id="+meet_id)
     document=generate_minutes()
     return document
     
