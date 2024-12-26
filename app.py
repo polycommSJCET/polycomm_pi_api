@@ -4,7 +4,7 @@ from googletrans import Translator
 from flask_cors import CORS  
 import os
 import json
-
+from minutes import generate_minutes
 
 app = Flask(__name__)
 CORS(app)
@@ -75,6 +75,15 @@ def translate_text():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+
+@app.route('/generate', methods=['GET'])
+def generate():
+
+    generate_minutes()
+    return "generated"
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
