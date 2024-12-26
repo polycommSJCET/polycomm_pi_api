@@ -49,4 +49,4 @@ def generate_minutes():
     final_message = "".join(message_content)
     print(final_message)
 
-    return "success"
+    return final_message

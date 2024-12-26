@@ -81,8 +81,8 @@ def translate_text():
 @app.route('/generate', methods=['GET'])
 def generate():
 
-    generate_minutes()
-    return "generated"
+    document=generate_minutes()
+    return document
     
 
 if __name__ == '__main__':
