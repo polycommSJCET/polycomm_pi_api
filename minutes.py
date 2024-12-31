@@ -14,7 +14,7 @@ class PDF(FPDF):
             self.set_font("Arial", "I", 8)
             self.cell(0, 10, f"Page {self.page_no()}", align="C")
 
-def generate_pdf(content):
+def generate_pdf(content,m_id):
         # Initialize PDF
         pdf = PDF()
         pdf.add_page()
@@ -45,14 +45,14 @@ def generate_pdf(content):
                 pdf.multi_cell(0, 10, line)
         
         # Save the PDF
-        output_file = "output.pdf"
+        output_file = m_id+".pdf"
         pdf.output(output_file)
         return output_file
 
-def generate_minutes():
+def generate_minutes(m_id):
     file_input=''
 
-    with open('sample_meeting.csv', mode='r') as file:
+    with open(m_id+'.csv', mode='r') as file:
         csv_reader = csv.reader(file)
             
         for row in csv_reader:
@@ -98,7 +98,7 @@ def generate_minutes():
 
 
     # Generate PDF
-    output_file = generate_pdf(final_message)
+    output_file = generate_pdf(final_message,m_id)
     print(f"PDF generated and saved as {output_file}")
 
 

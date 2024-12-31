@@ -5,6 +5,7 @@ from flask_cors import CORS
 import os
 import json
 from minutes import generate_minutes
+from supabaseupload import upload_file
 
 app = Flask(__name__)
 CORS(app)
@@ -20,7 +21,7 @@ def handle_meeting_file(meeting_id, data):
     # Open the file in append mode
     with open(file_name, 'a', newline='', encoding='utf-8') as csvfile:
         # Define CSV writer
-        fieldnames = ['meeting_id', 'speaker', 'text', 'language', 'detected_language', 'translated_text']
+        fieldnames = [ 'speaker', 'translated_text']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         # Write header if the file is being created for the first time
@@ -59,11 +60,8 @@ def translate_text():
 
         # Add the meeting ID and speaker to the data
         request_data = {
-            "meeting_id": meeting_id,
+            
             "speaker": speaker,
-            "text": text,
-            "language": src_lang,
-            "detected_language": translation.src,
             "translated_text": translation.text
         }
 
@@ -77,13 +75,31 @@ def translate_text():
         return jsonify({"error": str(e)}), 500
     
 
+@app.route('/endcall', methods=['POST'])
+def end_call():
+    try:
+        # Parse the request body
+        data = request.get_json()
+        meeting_id=data.get('m_id')
+        
+        document=generate_minutes(meeting_id)
 
-@app.route('/generate/<meet_id>', methods=['GET'])
-def generate(meet_id):
+        # Print the request body
+        print("Request body:", data)
 
-    print("meeting_id="+meet_id)
-    document=generate_minutes()
-    return document
+        # Respond with "ok"
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+# @app.route('/generate/<meet_id>', methods=['GET'])
+# def generate(meet_id):
+
+#     print("meeting_id="+meet_id)
+#     document=generate_minutes(meet_id)
+#     return document
     
 
 if __name__ == '__main__':
