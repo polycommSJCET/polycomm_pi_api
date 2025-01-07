@@ -6,6 +6,7 @@ import os
 import json
 from minutes import generate_minutes
 from supabaseupload import upload_file
+import ssl
 
 app = Flask(__name__)
 CORS(app)
@@ -103,4 +104,22 @@ def end_call():
     
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    #app.run(debug=True)
+    # Load SSL certificate and private key
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    
+    # Replace these paths with your actual certificate and key files
+    #cert_path = os.environ.get('SSL_CERT_PATH', 'path/to/certificate.pem')
+
+    #key_path = os.environ.get('SSL_KEY_PATH', 'path/to/private_key.pem')
+    cert_path ='./certificate.pem'
+    key_path = './private_key.pem'
+    
+    if os.path.exists(cert_path) and os.path.exists(key_path):
+        ssl_context.load_cert_chain(cert_path, key_path)
+        # Run with HTTPS
+        app.run(host='0.0.0.0', port=443, ssl_context=ssl_context)
+    else:
+        print("Warning: SSL certificate files not found. Running in HTTP mode (not recommended for production)")
+        # Fallback to HTTP (development only)
+        app.run(host='0.0.0.0', port=5000)
