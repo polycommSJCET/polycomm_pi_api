@@ -2,6 +2,8 @@ import json
 import requests
 import csv
 from fpdf import FPDF
+from docx import Document
+from datetime import datetime
 
 class PDF(FPDF):
         def header(self):
@@ -14,40 +16,92 @@ class PDF(FPDF):
             self.set_font("Arial", "I", 8)
             self.cell(0, 10, f"Page {self.page_no()}", align="C")
 
-def generate_pdf(content,m_id):
-        # Initialize PDF
-        pdf = PDF()
-        pdf.add_page()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.set_font("Arial", size=12)
-        
-        # Split content into lines
-        lines = content.split("\n")
-        
-        for line in lines:
-            line = line.strip()
-            if line.startswith("<") and line.endswith(">"):  # Identify headings (e.g., <Meeting Minutes>)
-                pdf.set_font("Arial", "B", 14)
-                pdf.ln(10)
-                pdf.cell(0, 10, line.strip("<>"), ln=True)
-            elif line.startswith("-") or line.startswith("*"):  # Bulleted lists
-                pdf.set_font("Arial", "I", 12)
-                pdf.cell(10)  # Add indentation
-                pdf.multi_cell(0, 10, line)
-            elif line.isdigit() or line.startswith("1.") or line.startswith("2."):  # Numbered lists
-                pdf.set_font("Arial", "I", 12)
-                pdf.cell(10)  # Add indentation
-                pdf.multi_cell(0, 10, line)
-            elif line == "":  # Empty lines
-                pdf.ln(5)
-            else:  # Regular paragraphs
-                pdf.set_font("Arial", size=12)
-                pdf.multi_cell(0, 10, line)
-        
-        # Save the PDF
-        output_file = m_id+".pdf"
-        pdf.output(output_file)
-        return output_file
+
+def generate_pdf(content, m_id):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
+
+    lines = content.split("\n")
+
+    for line in lines:
+        line = line.strip()
+
+        # Handling Heading
+        if line.startswith("<") and line.endswith(">"):  # Identifying headings (e.g., <Meeting Minutes>)
+            pdf.set_font("Arial", "B", 14)
+            pdf.ln(10)
+            pdf.cell(0, 10, line.strip("<>"), ln=True)
+
+        # Handling Bulleted Lists
+        elif line.startswith("-") or line.startswith("*"):
+            pdf.set_font("Arial", "I", 12)
+            pdf.cell(10)  # Add indentation
+            pdf.multi_cell(0, 10, line[2:].strip())  # Removing the bullet and adding a space
+
+        # Handling Numbered Lists
+        elif len(line) > 1 and line[0].isdigit() and line[1] == ".":
+            pdf.set_font("Arial", "I", 12)
+            pdf.cell(10)  # Add indentation
+            pdf.multi_cell(0, 10, line.strip())
+
+        # Handling Empty Lines
+        elif line == "":
+            pdf.ln(5)
+
+        # Handling Regular Paragraphs
+        else:
+            pdf.set_font("Arial", size=12)
+            pdf.multi_cell(0, 10, line)
+
+    output_file = m_id + ".pdf"
+    pdf.output(output_file)
+    return output_file
+
+
+def generate_word(content, m_id):
+    # Create Word document
+    doc = Document()
+    doc.add_heading("Meeting Minutes", level=1)
+
+    # Add generation date and time
+    generation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    doc.add_paragraph(f"Generated on: {generation_date}", style="Intense Quote")
+    doc.add_paragraph("\n")  # Add spacing between header and body
+
+    # Split and format content lines
+    lines = content.split("\n")
+    for line in lines:
+        line = line.strip()
+
+        # Handling Heading
+        if line.startswith("<") and line.endswith(">"):  # Headings (e.g., <Heading>)
+            clean_line = line.strip("<>")
+            doc.add_heading(clean_line, level=2)
+
+        # Handling Bulleted Lists
+        elif line.startswith("-") or line.startswith("*"):
+            clean_line = line[2:].strip()  # Removing bullet point and adding space
+            doc.add_paragraph(clean_line, style="List Bullet")
+
+        # Handling Numbered Lists
+        elif len(line) > 1 and line[0].isdigit() and line[1] == ".":
+            clean_line = line.strip()  # Removing leading digit
+            doc.add_paragraph(clean_line, style="List Number")
+
+        # Handling Empty Lines
+        elif line == "":
+            doc.add_paragraph("\n")  # Add empty space between sections
+
+        # Handling Regular Paragraphs
+        else:
+            doc.add_paragraph(line)
+
+    # Save the document
+    output_file = f"{m_id}.docx"
+    doc.save(output_file)
+    return output_file
 
 def generate_minutes(m_id):
     file_input=''
