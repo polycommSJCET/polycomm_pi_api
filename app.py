@@ -22,7 +22,7 @@ def handle_meeting_file(meeting_id, data):
     # Open the file in append mode
     with open(file_name, 'a', newline='', encoding='utf-8') as csvfile:
         # Define CSV writer
-        fieldnames = [ 'speaker', 'translated_text']
+        fieldnames = ['speaker', 'translated_text']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         # Write header if the file is being created for the first time
@@ -33,6 +33,9 @@ def handle_meeting_file(meeting_id, data):
         writer.writerow(data)
 
 
+@app.route('/test', methods=['GET'])
+def test():
+    return jsonify({"message": "Hello, World!"})
         
 
 @app.route('/translate', methods=['POST'])
@@ -112,8 +115,8 @@ if __name__ == '__main__':
     #cert_path = os.environ.get('SSL_CERT_PATH', 'path/to/certificate.pem')
 
     #key_path = os.environ.get('SSL_KEY_PATH', 'path/to/private_key.pem')
-    cert_path ='./certificate.pem'
-    key_path = './private_key.pem'
+    cert_path ='./certificate.crt'
+    key_path = './private.key'
     
     if os.path.exists(cert_path) and os.path.exists(key_path):
         ssl_context.load_cert_chain(cert_path, key_path)
