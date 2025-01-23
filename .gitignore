@@ -66,3 +66,6 @@ coverage.xml
 *.csv
 *.pdf
 
+
+#folder for temporary files
+__temp__/
