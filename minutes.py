@@ -4,6 +4,7 @@ import csv
 from fpdf import FPDF
 from docx import Document
 from datetime import datetime
+import pandas as pd
 
 class PDF(FPDF):
         def header(self):
@@ -55,7 +56,7 @@ def generate_pdf(content, m_id):
             pdf.set_font("Arial", size=12)
             pdf.multi_cell(0, 10, line)
 
-    output_file = m_id + ".pdf"
+    output_file = "__temp__/pdf/"+m_id + ".pdf"
     pdf.output(output_file)
     return output_file
 
@@ -99,14 +100,16 @@ def generate_word(content, m_id):
             doc.add_paragraph(line)
 
     # Save the document
-    output_file = f"{m_id}.docx"
+    output_file = f"__temp__/docx/{m_id}.docx"
     doc.save(output_file)
     return output_file
 
 def generate_minutes(m_id):
+
+    clear_duplicates(m_id)
     file_input=''
 
-    with open(m_id+'.csv', mode='r') as file:
+    with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
         csv_reader = csv.reader(file)
             
         for row in csv_reader:
@@ -148,7 +151,7 @@ def generate_minutes(m_id):
 
     # Combine all message parts into the final response
     final_message = "".join(message_content)
-    print(final_message)
+    #print(final_message)
 
 
     # Generate PDF
@@ -158,4 +161,30 @@ def generate_minutes(m_id):
 
     return final_message
 
+
+def clear_duplicates(m_id):
+
+    file_path="__temp__/csv/"+m_id+".csv"
+    df = pd.read_csv(file_path)
+
+    print(len(df))
+
+    i=0
+
+    while(i<(len(df)-1)):
+        #print(df.iloc[i]['speaker'])
+        
+        if((df.iloc[i]['speaker']==df.iloc[i+1]['speaker']) and (df.iloc[i]['translated_text'] in df.iloc[i+1]['translated_text'])):
+            print("duplicate at index ",i)
+            df.drop(i, axis=0, inplace=True)
+            df.reset_index(drop=True, inplace=True)
+            if i>0:
+                i-=1
+
+
+        else:
+            i+=1
+
+    df.to_csv(file_path, index=False)
+    return file_path
 

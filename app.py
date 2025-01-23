@@ -14,7 +14,7 @@ CORS(app)
 translator = Translator()
 def handle_meeting_file(meeting_id, data):
     # Define the file name based on meeting_id
-    file_name = f"{meeting_id}.csv"
+    file_name = f"__temp__/csv/{meeting_id}.csv"
 
     # Check if file exists
     file_exists = os.path.exists(file_name)
@@ -117,12 +117,14 @@ if __name__ == '__main__':
     #key_path = os.environ.get('SSL_KEY_PATH', 'path/to/private_key.pem')
     cert_path ='./certificate.crt'
     key_path = './private.key'
+
+    try:
     
-    if os.path.exists(cert_path) and os.path.exists(key_path):
-        ssl_context.load_cert_chain(cert_path, key_path)
-        # Run with HTTPS
-        app.run(host='0.0.0.0', port=443, ssl_context=ssl_context)
-    else:
+        if os.path.exists(cert_path) and os.path.exists(key_path):
+            ssl_context.load_cert_chain(cert_path, key_path)
+            # Run with HTTPS
+            app.run(host='0.0.0.0', port=443, ssl_context=ssl_context)
+    except Exception as e:
         print("Warning: SSL certificate files not found. Running in HTTP mode (not recommended for production)")
         # Fallback to HTTP (development only)
         app.run(host='0.0.0.0', port=5000)
