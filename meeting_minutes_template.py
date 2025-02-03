@@ -4,9 +4,15 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.enum.style import WD_STYLE_TYPE
+import ast
+import requests
+import csv
+import json
+
 
 # Variable to select the template
 TEMPLATE_SELECTION = 1  # Set to 1 for template 1, 2 for template 2
+m_id = 'sample_meeting'
 
 
 def create_element(name):
@@ -106,7 +112,6 @@ def create_document_template_1():
         ('Meeting Title:', 'Q4 2023 Product Development Strategy Meeting'),
         ('Date:', 'December 15, 2023'),
         ('Time:', '10:00 AM - 11:30 AM EST'),
-        ('Location:', 'Microsoft Teams Virtual Meeting'),
         ('Meeting Called By:', 'Sarah Chen, Product Director'),
         ('Meeting Type:', 'Regular Product Development Team Meeting')
     ]
@@ -120,69 +125,112 @@ def create_document_template_1():
 
     doc.add_paragraph().add_run('\n')
 
-    sections_content = [
-        ('1. Meeting Overview', [
-            ('Purpose of Meeting',
-             'Review Q4 progress and align on Q1 2024 product roadmap priorities.'),
-            ('Previous Minutes Review',
-             'Previous meeting minutes from November 30th were reviewed and approved. All action items were completed.'),
-            ('Approval of Agenda',
-             'Agenda was approved by all participants with no additions.')
+    file_input=''
+
+    with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
+        csv_reader = csv.reader(file)
+            
+        for row in csv_reader:
+            file_input += ", ".join(row) + "\n"
+
+    response = requests.post(
+        'http://localhost:11434/api/chat',
+        json={
+            "model": "llama3.2",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": """Generate meeting minutes and reply in the following format and make sure the strings are closed on the same line , ensure the reply is parsable with ast.literal_eval() , reply only available datas :
+       [('1. Meeting Overview', [
+           ('sub heading 1', 'content 1'),        
+           ('sub heading 2', 'content 2'),
         ]),
-        ('2. Attendees', [
-            ('Present',
-             'Sarah Chen (Product Director)\nMike Johnson (Lead Developer)\nPriya Patel (UX Designer)\n' +
-             'David Wilson (QA Lead)\nLisa Rodriguez (Scrum Master)'),
-            ('Apologies',
-             'Tom Baker (DevOps Engineer) - On planned leave'),
-            ('Absent',
-             'None')
-        ]),
-        ('3. Discussion Points', [
-            ('Key Points Discussed',
-             '1. Current sprint progress review\n' +
-             '   - 85% of planned stories completed\n' +
-             '   - Performance improvements achieved target metrics\n' +
-             '   - UI redesign received positive user feedback\n\n' +
-             '2. Technical debt assessment\n' +
-             '   - Identified three critical areas needing refactoring\n' +
-             '   - Legacy system migration plan reviewed\n\n' +
-             '3. Q1 2024 feature prioritization\n' +
-             '   - Mobile app enhancement ranked highest priority\n' +
-             '   - API versioning update scheduled for February'),
-            ('Decisions Made',
-             '1. Approved allocation of 20% sprint capacity to technical debt\n' +
-             '2. Confirmed Q1 roadmap priorities\n' +
-             '3. Agreed on new sprint planning format'),
-            ('Voting Results',
-             'Technical debt allocation: Unanimous approval (5/5 votes)')
-        ]),
-        ('4. Action Items', [
-            ('Tasks Assigned',
-             '1. Update sprint planning documentation\n' +
-             '2. Create technical debt backlog items\n' +
-             '3. Schedule user feedback sessions\n' +
-             '4. Prepare Q1 resource allocation plan'),
-            ('Responsibilities',
-             'Lisa: Sprint planning documentation\n' +
-             'Mike: Technical debt itemization\n' +
-             'Priya: User feedback session planning\n' +
-             'Sarah: Q1 resource plan'),
-            ('Deadlines',
-             'All actions to be completed by December 22, 2023')
-        ]),
-        ('5. Next Meeting', [
-            ('Date and Time',
-             'January 5, 2024, 10:00 AM EST'),
-            ('Location',
-             'Microsoft Teams'),
-            ('Preliminary Agenda',
-             '1. Q1 kickoff planning\n' +
-             '2. Resource allocation review\n' +
-             '3. Technical debt implementation plan\n' +
-             '4. New team member onboarding update')
-        ])
+       ('2. Attendees', [
+           ('Present',
+            'Person1, Person2, Person3 \n'), 
+           ('Apologies',
+            'Person1'),
+           ('Absent',
+            'Person1')
+       ]),
+       ('3. Discussion Points', [
+           ('Key Points Discussed',
+            '1. Key Point 1\n' 
+            '   - sub point 1\n' 
+            '   - sub point 2\n'  
+            '   - sub point n\n\n' 
+            '2. Key Point 2\n' 
+            '   - sub point 1\n' 
+            '   - sub point 2\n\n' 
+            '3. Key Point n\n' 
+            '   - sub point 1\n' 
+            '   - sub point n'),
+           ('Decisions Made',
+            '1. Decision 1\n' 
+            '2. Decision 2\n' 
+            '3. Decision n'),
+           ('Voting Results',
+            'result description')
+       ]),
+       ('4. Action Items', [
+           ('Tasks Assigned',
+            '1. task 1\n' 
+            '2. task 2\n' 
+            '3. task 3\n' 
+            'n. task n'),
+           ('Responsibilities',
+            'Person 1: Responsibility\n' 
+            'Person 2 : Responsibility\n' 
+            'Person n: Responsibility'),
+           ('Deadlines',
+            'deadline date here')
+       ]),
+       ('5. Next Meeting', [
+           ('Date and Time',
+            'date and time mentioned'),
+           ('Preliminary Agenda',
+            '1. value 1\n' 
+            '2. value 2\n' 
+            '3. value 3\n' 
+            '4. value 4')
+       ])
     ]
+                    """
+                },
+                {
+                    "role": "user",
+                    "content": "Generate meeting minutes based on the following conversation: "+file_input
+                }
+            ]
+        },
+        stream=True  # Enable streaming
+    )
+
+    message_content = []
+
+    for line in response.iter_lines():
+
+        if line:  # Ignore empty lines
+            try:
+                # Parse the line as JSON
+                #print(line)
+                data = json.loads(line)
+                # Append content if the "message" key exists
+                if "message" in data and "content" in data["message"]:
+                    message_content.append(data["message"]["content"])
+            except json.JSONDecodeError:
+                print("Failed to decode line:", line)
+
+    # Combine all message parts into the final response
+    final_message = """""".join(message_content)
+
+    start = final_message.find('[')
+    end = final_message.rfind(']') + 1
+    final_message = final_message[start:end]
+
+    #print(final_message)
+
+    sections_content = ast.literal_eval(final_message)
 
     for section_title, subsections in sections_content:
         heading = doc.add_heading(section_title, level=1)
