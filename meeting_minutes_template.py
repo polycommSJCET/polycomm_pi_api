@@ -4,16 +4,15 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.enum.style import WD_STYLE_TYPE
+import ast
 import requests
 import csv
 import json
-import ast
-import re
-
 
 
 # Variable to select the template
 TEMPLATE_SELECTION = 1  # Set to 1 for template 1, 2 for template 2
+m_id = 'sample_meeting'
 
 
 def create_element(name):
@@ -126,83 +125,13 @@ def create_document_template_1():
 
     doc.add_paragraph().add_run('\n')
 
-
-    '''
-    sections_content = [
-        ('1. Meeting Overview', [
-            ('Purpose of Meeting',
-             'Review Q4 progress and align on Q1 2024 product roadmap priorities.'),
-            ('Previous Minutes Review',
-             'Previous meeting minutes from November 30th were reviewed and approved. All action items were completed.'),
-            ('Approval of Agenda',
-             'Agenda was approved by all participants with no additions.')
-        ]),
-        ('2. Attendees', [
-            ('Present',
-             'Sarah Chen (Product Director)\nMike Johnson (Lead Developer)\nPriya Patel (UX Designer)\n' +
-             'David Wilson (QA Lead)\nLisa Rodriguez (Scrum Master)'),
-            ('Apologies',
-             'Tom Baker (DevOps Engineer) - On planned leave'),
-            ('Absent',
-             'None')
-        ]),
-        ('3. Discussion Points', [
-            ('Key Points Discussed',
-             '1. Current sprint progress review\n' +
-             '   - 85% of planned stories completed\n' +
-             '   - Performance improvements achieved target metrics\n' +
-             '   - UI redesign received positive user feedback\n\n' +
-             '2. Technical debt assessment\n' +
-             '   - Identified three critical areas needing refactoring\n' +
-             '   - Legacy system migration plan reviewed\n\n' +
-             '3. Q1 2024 feature prioritization\n' +
-             '   - Mobile app enhancement ranked highest priority\n' +
-             '   - API versioning update scheduled for February'),
-            ('Decisions Made',
-             '1. Approved allocation of 20% sprint capacity to technical debt\n' +
-             '2. Confirmed Q1 roadmap priorities\n' +
-             '3. Agreed on new sprint planning format'),
-            ('Voting Results',
-             'Technical debt allocation: Unanimous approval (5/5 votes)')
-        ]),
-        ('4. Action Items', [
-            ('Tasks Assigned',
-             '1. Update sprint planning documentation\n' +
-             '2. Create technical debt backlog items\n' +
-             '3. Schedule user feedback sessions\n' +
-             '4. Prepare Q1 resource allocation plan'),
-            ('Responsibilities',
-             'Lisa: Sprint planning documentation\n' +
-             'Mike: Technical debt itemization\n' +
-             'Priya: User feedback session planning\n' +
-             'Sarah: Q1 resource plan'),
-            ('Deadlines',
-             'All actions to be completed by December 22, 2023')
-        ]),
-        ('5. Next Meeting', [
-            ('Date and Time',
-             'January 5, 2024, 10:00 AM EST'),
-            ('Location',
-             'Microsoft Teams'),
-            ('Preliminary Agenda',
-             '1. Q1 kickoff planning\n' +
-             '2. Resource allocation review\n' +
-             '3. Technical debt implementation plan\n' +
-             '4. New team member onboarding update')
-        ])
-    ]
-
-    '''
-
     file_input=''
 
-    with open('__temp__/csv/sample_meeting.csv', mode='r') as file:
+    with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
         csv_reader = csv.reader(file)
-
             
         for row in csv_reader:
             file_input += ", ".join(row) + "\n"
-
 
     response = requests.post(
         'http://localhost:11434/api/chat',
@@ -211,14 +140,14 @@ def create_document_template_1():
             "messages": [
                 {
                     "role": "system",
-                    "content": """Generate meeting minutes and reply in the following format, reply only available datas :
+                    "content": """Generate meeting minutes and reply in the following format and make sure the strings are closed on the same line , ensure the reply is parsable with ast.literal_eval() , reply only available datas :
        [('1. Meeting Overview', [
            ('sub heading 1', 'content 1'),        
            ('sub heading 2', 'content 2'),
         ]),
        ('2. Attendees', [
            ('Present',
-            'Person1 \nPerson2 \nPerson3 \n'), 
+            'Person1, Person2, Person3 \n'), 
            ('Apologies',
             'Person1'),
            ('Absent',
@@ -277,13 +206,14 @@ def create_document_template_1():
         stream=True  # Enable streaming
     )
 
-
     message_content = []
 
     for line in response.iter_lines():
+
         if line:  # Ignore empty lines
             try:
                 # Parse the line as JSON
+                #print(line)
                 data = json.loads(line)
                 # Append content if the "message" key exists
                 if "message" in data and "content" in data["message"]:
@@ -292,26 +222,15 @@ def create_document_template_1():
                 print("Failed to decode line:", line)
 
     # Combine all message parts into the final response
-    #print(response)
-    final_msg = "".join(message_content)
-    print(final_msg)
+    final_message = """""".join(message_content)
 
-    
+    start = final_message.find('[')
+    end = final_message.rfind(']') + 1
+    final_message = final_message[start:end]
 
-    pattern = r"\[\s*\(.*?\)\s*\]"
-    matches = re.search(pattern, final_msg, re.DOTALL)
+    #print(final_message)
 
-    if matches:
-        extracted_list = matches.group(0)
-        sections_content = ast.literal_eval(extracted_list)  # Safely parse the list from the string
-        #print(sections_content)
-    else:
-        print("No valid list found in the response.")
-
-    
-
-
-
+    sections_content = ast.literal_eval(final_message)
 
     for section_title, subsections in sections_content:
         heading = doc.add_heading(section_title, level=1)
