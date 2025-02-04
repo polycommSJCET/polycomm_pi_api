@@ -85,11 +85,17 @@ def end_call():
         # Parse the request body
         data = request.get_json()
         meeting_id=data.get('m_id')
+        callendadmin=data.get('callended')
         
         document=generate_minutes(meeting_id)
+        
+        
 
         # Print the request body
         print("Request body:", data)
+        
+        upload_file('__temp__/csv/'+meeting_id+'.csv',meeting_id,callendadmin)
+        
 
         # Respond with "ok"
         return jsonify({"status": "ok"}), 200
