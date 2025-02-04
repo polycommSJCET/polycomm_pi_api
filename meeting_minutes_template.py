@@ -11,7 +11,7 @@ import json
 
 
 # Variable to select the template
-TEMPLATE_SELECTION = 1  # Set to 1 for template 1, 2 for template 2
+TEMPLATE_SELECTION = 2  # Set to 1 for template 1, 2 for template 2
 m_id = 'sample_meeting'
 
 
@@ -44,7 +44,7 @@ def create_style(doc, name, font_name='Helvetica', size=11, color=RGBColor(0, 0,
     return style
 
 
-def create_document_template_1():
+def create_document_template_1(m_id):
     doc = Document()
     section = doc.sections[0]
     section.page_height = Cm(29.7)
@@ -250,10 +250,10 @@ def create_document_template_1():
     create_page_number(footer_para)
     footer_para.add_run(' | Confidential').font.size = Pt(8)
 
-    doc.save('formal_meeting_minutes.docx')
+    doc.save('__temp__/docx/'+m_id+'_1.docx')
 
 
-def create_document_template_2():
+def create_document_template_2(m_id):
     doc = Document()
     section = doc.sections[0]
     section.page_height = Cm(29.7)
@@ -313,35 +313,88 @@ def create_document_template_2():
         detail_para.add_run(f'{label}: ').bold = True
         detail_para.add_run(value)
 
-    sections = [
+    format =""" [
         ('Participants', [
             ('Present', [
-                'Sarah Chen (Product Director)',
-                'Mike Johnson (Lead Developer)',
-                'Priya Patel (UX Designer)'
+                'Person1',
+                'Person2',
+                'Person n'
             ]),
-            ('Absent', ['None'])
+            ('Absent', ['Person 1','Person 2']),
         ]),
         ('Key Discussion Points', [
-            ('Sprint Review', [
-                '• Current sprint completion: 85%',
-                '• Performance metrics achieved',
-                '• UI redesign feedback positive'
+            ('Topic 1', [
+                '• point 1',
+                '• point 2',
+                '• point 3'
             ]),
-            ('Technical Planning', [
-                '• Architecture updates approved',
-                '• Resource allocation confirmed',
-                '• Timeline adjusted for Q1'
+            ('Topic 2', [
+                '• point 1',
+                '• point 3',
+                '• point n'
             ])
         ]),
         ('Action Items', [
             ('High Priority', [
-                '→ Update documentation (Lisa, Dec 22)',
-                '→ Technical debt analysis (Mike, Dec 22)',
-                '→ User feedback collection (Priya, Dec 22)'
+                '→ Item 1 (Person assigned, Date)',
+                '→ Item 2 (Person assigned, Date)',
+                '→ Item 3 (Person assigned, Date)'
             ])
         ])
-    ]
+    ]"""
+
+    file_input=''
+
+    with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
+        csv_reader = csv.reader(file)
+            
+        for row in csv_reader:
+            file_input += ", ".join(row) + "\n"
+
+    response = requests.post(
+        'http://localhost:11434/api/chat',
+        json={
+            "model": "llama3.2",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": """Generate meeting minutes and reply in the following format and make sure the strings are closed on the same line , ensure the reply is parsable with ast.literal_eval() , reply only available datas :
+                    """+format
+                },
+                {
+                    "role": "user",
+                    "content": "Generate meeting minutes based on the following conversation: "+file_input
+                }
+            ]
+        },
+        stream=True  # Enable streaming
+    )
+
+    message_content = []
+
+    for line in response.iter_lines():
+
+        if line:  # Ignore empty lines
+            try:
+                # Parse the line as JSON
+                #print(line)
+                data = json.loads(line)
+                # Append content if the "message" key exists
+                if "message" in data and "content" in data["message"]:
+                    message_content.append(data["message"]["content"])
+            except json.JSONDecodeError:
+                print("Failed to decode line:", line)
+
+    # Combine all message parts into the final response
+    final_message = """""".join(message_content)
+
+    start = final_message.find('[')
+    end = final_message.rfind(']') + 1
+    final_message = final_message[start:end]
+
+    #print(final_message)
+
+    sections = ast.literal_eval(final_message)
 
     doc.add_paragraph().add_run('\n')
 
@@ -378,10 +431,10 @@ def create_document_template_2():
     create_page_number(footer_para)
     footer_para.add_run(' | Growisen Technologies')
 
-    doc.save('modern_minutes.docx')
+    doc.save('__temp__/docx/'+m_id+'_2.docx')
 
 
 if TEMPLATE_SELECTION == 1:
-    create_document_template_1()
+    create_document_template_1("sample_meeting")
 elif TEMPLATE_SELECTION == 2:
-    create_document_template_2()
+    create_document_template_2("sample_meeting")
