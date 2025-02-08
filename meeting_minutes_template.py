@@ -11,8 +11,8 @@ import json
 
 
 # Variable to select the template
-TEMPLATE_SELECTION = 2  # Set to 1 for template 1, 2 for template 2
-m_id = 'sample_meeting'
+# TEMPLATE_SELECTION = 2  # Set to 1 for template 1, 2 for template 2
+# m_id = 'sample_meeting'
 
 
 def create_element(name):
@@ -254,6 +254,7 @@ def create_document_template_1(m_id):
 
 
 def create_document_template_2(m_id):
+    print("template2")
     doc = Document()
     section = doc.sections[0]
     section.page_height = Cm(29.7)
@@ -434,7 +435,7 @@ def create_document_template_2(m_id):
     doc.save('__temp__/docx/'+m_id+'_2.docx')
 
 
-if TEMPLATE_SELECTION == 1:
-    create_document_template_1("sample_meeting")
-elif TEMPLATE_SELECTION == 2:
-    create_document_template_2("sample_meeting")
+# if TEMPLATE_SELECTION == 1:
+#     create_document_template_1("sample_meeting")
+# elif TEMPLATE_SELECTION == 2:
+#     create_document_template_2("sample_meeting")
