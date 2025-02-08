@@ -1,12 +1,17 @@
 import csv
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from googletrans import Translator
 from flask_cors import CORS  
 import os
 import json
 from minutes import generate_minutes
-from supabaseupload import upload_file
+from supabaseupload import save_meeting_data
 import ssl
+import logging
+from meeting_minutes_template import create_document_template_1, create_document_template_2
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 CORS(app)
@@ -77,29 +82,29 @@ def translate_text():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
 
 @app.route('/endcall', methods=['POST'])
 def end_call():
     try:
-        # Parse the request body
         data = request.get_json()
-        meeting_id=data.get('m_id')
-        callendadmin=data.get('callended')
-        
-        document=generate_minutes(meeting_id)
-        
-        
+        logging.debug(f"Received data: {data}")
 
-        # Print the request body
-        print("Request body:", data)
-        
-        upload_file('__temp__/csv/'+meeting_id+'.csv',meeting_id,callendadmin)
-        
+        # Generate meeting minutes
+        document = generate_minutes(data.get('m_id'))
+        logging.debug(f"Generated document: {document}")
 
-        # Respond with "ok"
-        return jsonify({"status": "ok"}), 200
+        # Save meeting data to Supabase
+        result = save_meeting_data(data)
+        logging.debug(f"Supabase result: {result}")
+
+        return jsonify({
+            "status": "ok",
+            "meeting_data": result
+        }), 200
+
     except Exception as e:
+        logging.error(f"Error in end_call: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -110,27 +115,46 @@ def end_call():
 #     print("meeting_id="+meet_id)
 #     document=generate_minutes(meet_id)
 #     return document
+
+@app.route('/generate-minutes', methods=['POST'])
+def generate():
+    data = request.get_json()
+    print("Received Data:", data)
+    meeting_id = data.get('meetingId')
+    template_id = data.get('templateId')
+
+    if not meeting_id or not template_id:
+        return jsonify({"error": "Fields 'meetingId' and 'templateId' are required"}), 400
+
+    if template_id == 1:
+        print("1");
+        create_document_template_1(meeting_id)
+        file_path = f'__temp__/docx/{meeting_id}_1.docx'
+    elif template_id == 2:
+        create_document_template_2(meeting_id)
+        file_path = f'__temp__/docx/{meeting_id}_2.docx'
+    else:
+        return jsonify({"error": "Invalid templateId"}), 400
+
+    return send_file(file_path, as_attachment=True)
     
 
 if __name__ == '__main__':
-    #app.run(debug=True)
     # Load SSL certificate and private key
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     
     # Replace these paths with your actual certificate and key files
-    #cert_path = os.environ.get('SSL_CERT_PATH', 'path/to/certificate.pem')
-
-    #key_path = os.environ.get('SSL_KEY_PATH', 'path/to/private_key.pem')
-    cert_path ='./certificate.crt'
+    cert_path = './certificate.crt'
     key_path = './private.key'
 
     try:
-    
         if os.path.exists(cert_path) and os.path.exists(key_path):
             ssl_context.load_cert_chain(cert_path, key_path)
             # Run with HTTPS
             app.run(host='0.0.0.0', port=443, ssl_context=ssl_context)
+        else:
+            raise FileNotFoundError("SSL certificate files not found.")
     except Exception as e:
-        print("Warning: SSL certificate files not found. Running in HTTP mode (not recommended for production)")
+        print(f"Warning: {str(e)} Running in HTTP mode (not recommended for production)")
         # Fallback to HTTP (development only)
         app.run(host='0.0.0.0', port=5000)
