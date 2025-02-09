@@ -1,6 +1,7 @@
 import datetime
 import requests
 import logging
+import pytz
 
 # Supabase project details
 SUPABASE_URL = "https://iljsvpxoiwnwxtjxypgi.supabase.co"
@@ -56,6 +57,21 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
         # Extract data from the request
         call_ended_by = meeting_data.get('callended', {})
         meeting_id = meeting_data.get('m_id')
+        call_start_time_str = call_ended_by.get('callStartTime')
+        
+        # Parse the start time and convert it to IST
+        call_start_time_utc = datetime.datetime.fromisoformat(call_start_time_str)
+        ist = pytz.timezone('Asia/Kolkata')
+        call_start_time_ist = call_start_time_utc.astimezone(ist)
+
+        # Get the current time in IST
+        call_end_time_utc = datetime.datetime.now(datetime.timezone.utc)
+        call_end_time_ist = call_end_time_utc.astimezone(ist)
+        duration_seconds = (call_end_time_ist - call_start_time_ist).total_seconds()
+
+        # Calculate duration in hours and minutes
+        duration_hours = int(duration_seconds // 3600)
+        duration_minutes = int((duration_seconds % 3600) // 60)
 
         # Prepare meeting record
         meeting_record = {
@@ -63,7 +79,13 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
             'ended_by_user_id': call_ended_by.get('id'),
             'ended_by_name': call_ended_by.get('name'),
             'ended_by_role': call_ended_by.get('role'),
-            'ended_at': datetime.datetime.utcnow().isoformat(),
+            'ended_at': call_end_time_ist.isoformat(),
+            'started_at': call_start_time_ist.isoformat(),
+            'duration': {
+                'seconds': duration_seconds,
+                'hours': duration_hours,
+                'minutes': duration_minutes
+            },
             'user_metadata': {
                 'image': call_ended_by.get('image'),
                 'language': call_ended_by.get('language'),
@@ -73,6 +95,8 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
                 'online_status': call_ended_by.get('online'),
             }
         }
+        
+        print(meeting_record)
 
         # Insert data into Supabase table
         table_url = f"{supabase_url}/rest/v1/meetings"
