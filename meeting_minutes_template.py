@@ -8,11 +8,16 @@ import ast
 import requests
 import csv
 import json
+from datetime import datetime
+import pytz
 
 
 # Variable to select the template
 # TEMPLATE_SELECTION = 2  # Set to 1 for template 1, 2 for template 2
 # m_id = 'sample_meeting'
+SUPABASE_URL = "https://iljsvpxoiwnwxtjxypgi.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsanN2cHhvaXdud3h0anh5cGdpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODk5NzYwMiwiZXhwIjoyMDU0NTczNjAyfQ.yHQOgRkEGo_NvJeT6ikONQQLiIhcuVVdsNcjZJE_9Rg"  # Use the service role key for secure upload
+BUCKET_NAME = "Polycomm"  
 
 
 def create_element(name):
@@ -42,6 +47,33 @@ def create_style(doc, name, font_name='Helvetica', size=11, color=RGBColor(0, 0,
     font.color.rgb = color
     font.bold = bold
     return style
+
+
+def format_date(iso_str):
+    utc_time = datetime.fromisoformat(iso_str)
+    local_tz = pytz.timezone('Asia/Kolkata')
+    local_time = utc_time.astimezone(local_tz)
+    return local_time.strftime('%B %d, %Y')
+
+def format_time(iso_str):
+    utc_time = datetime.fromisoformat(iso_str)
+    local_tz = pytz.timezone('Asia/Kolkata')
+    local_time = utc_time.astimezone(local_tz)
+    return local_time.strftime('%I:%M %p')
+
+
+def fetch_meeting_info(meeting_id):
+    # Fetch meeting info from the database
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/meetings?meeting_id=eq.{meeting_id}", headers={
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}'
+    })
+    response.raise_for_status()
+    meeting_info = response.json()
+    if meeting_info:
+        return meeting_info[0]
+    else:
+        raise ValueError("Meeting info not found")
 
 
 def create_document_template_1(m_id):
@@ -108,15 +140,25 @@ def create_document_template_1(m_id):
 
     meeting_info_table = doc.add_table(rows=6, cols=2)
     meeting_info_table.style = 'Table Grid'
-    meeting_info = [
-        ('Meeting Title:', 'Q4 2023 Product Development Strategy Meeting'),
-        ('Date:', 'December 15, 2023'),
-        ('Time:', '10:00 AM - 11:30 AM EST'),
-        ('Meeting Called By:', 'Sarah Chen, Product Director'),
-        ('Meeting Type:', 'Regular Product Development Team Meeting')
+
+    meeting_info = fetch_meeting_info(m_id)
+    
+    print(meeting_info)
+
+    start_date = format_date(meeting_info.get('started_at', 'N/A'))
+    start_time = format_time(meeting_info.get('started_at', 'N/A'))
+    end_time = format_time(meeting_info.get('ended_at', 'N/A'))
+
+    meeting_details = [
+        ('Meeting Title:', meeting_info.get('meeting_title', 'N/A')),
+        ('Date:', start_date),
+        ('Time:', f"{start_time} - {end_time}"),
+        ('Meeting Called By:', meeting_info.get('ended_by_name', 'N/A')),
+        ('Meeting Type:', meeting_info.get('meeting_type', 'N/A')),
+        ('Location:', 'Polycomm')
     ]
 
-    for i, (label, value) in enumerate(meeting_info):
+    for i, (label, value) in enumerate(meeting_details):
         cell_label = meeting_info_table.cell(i, 0)
         cell_value = meeting_info_table.cell(i, 1)
         cell_label.text = label
@@ -299,11 +341,17 @@ def create_document_template_2(m_id):
     overview_para.style = modern_heading
     overview_para.add_run('Meeting Overview').bold = True
 
+    meeting_info = fetch_meeting_info(m_id)
+
+    start_date = format_date(meeting_info.get('started_at', 'N/A'))
+    start_time = format_time(meeting_info.get('started_at', 'N/A'))
+    end_time = format_time(meeting_info.get('ended_at', 'N/A'))
+
     meeting_details = [
-        ('Date & Time', 'December 15, 2023 | 10:00 AM - 11:30 AM EST'),
-        ('Location', 'Microsoft Teams Virtual Meeting'),
-        ('Organizer', 'Sarah Chen, Product Director'),
-        ('Meeting ID', 'MTG-2023-12-15-001')
+        ('Date & Time', f"{start_date} | {start_time} - {end_time}"),
+        ('Location', 'Polycomm'),
+        ('Organizer', meeting_info.get('ended_by_name', 'N/A')),
+        ('Meeting ID', meeting_info.get('meeting_id', 'N/A'))
     ]
 
     for label, value in meeting_details:
