@@ -8,11 +8,16 @@ import ast
 import requests
 import csv
 import json
+from datetime import datetime
+import pytz
 
 
 # Variable to select the template
 # TEMPLATE_SELECTION = 2  # Set to 1 for template 1, 2 for template 2
 # m_id = 'sample_meeting'
+SUPABASE_URL = "https://iljsvpxoiwnwxtjxypgi.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsanN2cHhvaXdud3h0anh5cGdpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODk5NzYwMiwiZXhwIjoyMDU0NTczNjAyfQ.yHQOgRkEGo_NvJeT6ikONQQLiIhcuVVdsNcjZJE_9Rg"  # Use the service role key for secure upload
+BUCKET_NAME = "Polycomm"  
 
 
 def create_element(name):
@@ -44,7 +49,34 @@ def create_style(doc, name, font_name='Helvetica', size=11, color=RGBColor(0, 0,
     return style
 
 
-def create_document_template_1(m_id):
+def format_date(iso_str):
+    utc_time = datetime.fromisoformat(iso_str)
+    local_tz = pytz.timezone('Asia/Kolkata')
+    local_time = utc_time.astimezone(local_tz)
+    return local_time.strftime('%B %d, %Y')
+
+def format_time(iso_str):
+    utc_time = datetime.fromisoformat(iso_str)
+    local_tz = pytz.timezone('Asia/Kolkata')
+    local_time = utc_time.astimezone(local_tz)
+    return local_time.strftime('%I:%M %p')
+
+
+def fetch_meeting_info(meeting_id):
+    # Fetch meeting info from the database
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/meetings?meeting_id=eq.{meeting_id}", headers={
+        'apikey': SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}'
+    })
+    response.raise_for_status()
+    meeting_info = response.json()
+    if (meeting_info):
+        return meeting_info[0]
+    else:
+        raise ValueError("Meeting info not found")
+
+
+def create_document_template_1(m_id, organization_name, title, meeting_type, logo_path):
     doc = Document()
     section = doc.sections[0]
     section.page_height = Cm(29.7)
@@ -89,39 +121,52 @@ def create_document_template_1(m_id):
 
     header_table = header.add_table(1, 2, width=Inches(6))
     header_cells = header_table.rows[0].cells
-    logo_path = 'logo-dark.png'
     logo_run = header_cells[0].paragraphs[0].add_run()
-    logo_run.add_picture(logo_path, width=Inches(1))
 
     company_para = header_cells[1].paragraphs[0]
-    company_para.text = "Growisen Technologies"
     company_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     company_para.style = styles['Normal']
+    if not company_para.runs:
+        company_para.add_run()
+    company_para.runs[0].text = organization_name
     company_para.runs[0].font.bold = True
     company_para.runs[0].font.size = Pt(14)
 
-    title = doc.add_heading('MEETING MINUTES', 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.style = styles['Normal']
-    title.runs[0].font.size = Pt(18)
-    title.runs[0].font.bold = True
+    doc_title = doc.add_heading('MEETING MINUTES', 0)
+    doc_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc_title.style = styles['Normal']
+    doc_title.runs[0].font.size = Pt(18)
+    doc_title.runs[0].font.bold = True
 
     meeting_info_table = doc.add_table(rows=6, cols=2)
     meeting_info_table.style = 'Table Grid'
-    meeting_info = [
-        ('Meeting Title:', 'Q4 2023 Product Development Strategy Meeting'),
-        ('Date:', 'December 15, 2023'),
-        ('Time:', '10:00 AM - 11:30 AM EST'),
-        ('Meeting Called By:', 'Sarah Chen, Product Director'),
-        ('Meeting Type:', 'Regular Product Development Team Meeting')
+
+    meeting_info = fetch_meeting_info(m_id)
+    
+    print(meeting_info)
+
+    start_date = format_date(meeting_info.get('started_at', 'N/A'))
+    start_time = format_time(meeting_info.get('started_at', 'N/A'))
+    end_time = format_time(meeting_info.get('ended_at', 'N/A'))
+
+    meeting_details = [
+        ('Meeting Title:', title),
+        ('Date:', start_date),
+        ('Time:', f"{start_time} - {end_time}"),
+        ('Meeting Called By:', meeting_info.get('ended_by_name', 'N/A')),
+        ('Meeting Type:', meeting_type),
+        ('Location:', 'Polycomm')
     ]
 
-    for i, (label, value) in enumerate(meeting_info):
+    for i, (label, value) in enumerate(meeting_details):
         cell_label = meeting_info_table.cell(i, 0)
         cell_value = meeting_info_table.cell(i, 1)
         cell_label.text = label
-        cell_value.text = value
+        cell_value.text = str(value)  # Ensure value is a string
         cell_label.paragraphs[0].runs[0].font.bold = True
+
+    if logo_path:
+        logo_run.add_picture(logo_path, width=Inches(1))
 
     doc.add_paragraph().add_run('\n')
 
@@ -140,18 +185,15 @@ def create_document_template_1(m_id):
             "messages": [
                 {
                     "role": "system",
-                    "content": """Generate meeting minutes and reply in the following format and make sure the strings are closed on the same line , ensure the reply is parsable with ast.literal_eval() , reply only available datas :
+                    "content": """Generate meeting minutes and reply in the following format and make sure the strings are closed on the same line, ensure the reply is parsable with ast.literal_eval(), reply only available datas:
        [('1. Meeting Overview', [
            ('sub heading 1', 'content 1'),        
            ('sub heading 2', 'content 2'),
         ]),
        ('2. Attendees', [
-           ('Present',
-            'Person1, Person2, Person3 \n'), 
-           ('Apologies',
-            'Person1'),
-           ('Absent',
-            'Person1')
+           ('Present', 'Names of present attendees'), 
+           ('Apologies', 'Names of attendees who sent apologies'),
+           ('Absent', 'Names of absent attendees')
        ]),
        ('3. Discussion Points', [
            ('Key Points Discussed',
@@ -228,9 +270,12 @@ def create_document_template_1(m_id):
     end = final_message.rfind(']') + 1
     final_message = final_message[start:end]
 
-    #print(final_message)
-
-    sections_content = ast.literal_eval(final_message)
+    # Ensure the content is correctly parsed and added to the document
+    try:
+        sections_content = ast.literal_eval(final_message)
+    except (SyntaxError, ValueError) as e:
+        print(f"Error parsing final_message: {final_message}")
+        raise e
 
     for section_title, subsections in sections_content:
         heading = doc.add_heading(section_title, level=1)
@@ -253,7 +298,7 @@ def create_document_template_1(m_id):
     doc.save('__temp__/docx/'+m_id+'_1.docx')
 
 
-def create_document_template_2(m_id):
+def create_document_template_2(m_id, organization_name, title, meeting_type, logo_path):
     print("template2")
     doc = Document()
     section = doc.sections[0]
@@ -284,12 +329,10 @@ def create_document_template_2(m_id):
 
     logo_cell = title_table.cell(0, 0)
     logo_run = logo_cell.paragraphs[0].add_run()
-    logo_run.add_picture('logo-dark.png', width=Inches(1.5))
 
     title_cell = title_table.cell(0, 1)
     title_para = title_cell.paragraphs[0]
     title_para.style = modern_title
-    title_para.text = "Meeting Minutes"
     title_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
     doc.add_paragraph('_' * 100).alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -299,11 +342,17 @@ def create_document_template_2(m_id):
     overview_para.style = modern_heading
     overview_para.add_run('Meeting Overview').bold = True
 
+    meeting_info = fetch_meeting_info(m_id)
+
+    start_date = format_date(meeting_info.get('started_at', 'N/A'))
+    start_time = format_time(meeting_info.get('started_at', 'N/A'))
+    end_time = format_time(meeting_info.get('ended_at', 'N/A'))
+
     meeting_details = [
-        ('Date & Time', 'December 15, 2023 | 10:00 AM - 11:30 AM EST'),
-        ('Location', 'Microsoft Teams Virtual Meeting'),
-        ('Organizer', 'Sarah Chen, Product Director'),
-        ('Meeting ID', 'MTG-2023-12-15-001')
+        ('Date & Time', f"{start_date} | {start_time} - {end_time}"),
+        ('Location', 'Polycomm'),
+        ('Organizer', meeting_info.get('ended_by_name', 'N/A')),
+        ('Meeting ID', meeting_info.get('meeting_id', 'N/A'))
     ]
 
     for label, value in meeting_details:
@@ -314,14 +363,14 @@ def create_document_template_2(m_id):
         detail_para.add_run(f'{label}: ').bold = True
         detail_para.add_run(value)
 
-    format =""" [
+    if logo_path:
+        logo_run.add_picture(logo_path, width=Inches(1.5))
+    title_para.text = title
+
+    format = """ [
         ('Participants', [
-            ('Present', [
-                'Person1',
-                'Person2',
-                'Person n'
-            ]),
-            ('Absent', ['Person 1','Person 2']),
+            ('Present', 'Names of present attendees'),
+            ('Absent', 'Names of absent attendees'),
         ]),
         ('Key Discussion Points', [
             ('Topic 1', [
@@ -393,11 +442,12 @@ def create_document_template_2(m_id):
     end = final_message.rfind(']') + 1
     final_message = final_message[start:end]
 
-    #print(final_message)
-
-    sections = ast.literal_eval(final_message)
-
-    doc.add_paragraph().add_run('\n')
+    # Ensure the content is correctly parsed and added to the document
+    try:
+        sections = ast.literal_eval(final_message)
+    except (SyntaxError, ValueError) as e:
+        print(f"Error parsing final_message: {final_message}")
+        raise e
 
     for section_title, subsections in sections:
         section_para = doc.add_paragraph()
@@ -430,7 +480,7 @@ def create_document_template_2(m_id):
 
     page_number = footer_para.add_run()
     create_page_number(footer_para)
-    footer_para.add_run(' | Growisen Technologies')
+    footer_para.add_run(f' | {organization_name}')
 
     doc.save('__temp__/docx/'+m_id+'_2.docx')
 
