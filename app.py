@@ -9,6 +9,7 @@ from supabaseupload import save_meeting_data
 import ssl
 import logging
 from meeting_minutes_template import create_document_template_1, create_document_template_2
+from werkzeug.utils import secure_filename
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -118,25 +119,43 @@ def end_call():
 
 @app.route('/generate-minutes', methods=['POST'])
 def generate():
-    data = request.get_json()
-    print("Received Data:", data)
+    data = request.form
+    logging.debug(f"Received Data: {data}")
     meeting_id = data.get('meetingId')
     template_id = data.get('templateId')
+    organization_name = data.get('organizationName')
+    title = data.get('title')
+    meeting_type = data.get('meetingType')
+    logo = request.files.get('logo')
 
-    if not meeting_id or not template_id:
-        return jsonify({"error": "Fields 'meetingId' and 'templateId' are required"}), 400
+    if not meeting_id or not template_id or not organization_name or not title or not meeting_type:
+        logging.error("Missing required fields")
+        return jsonify({"error": "Fields 'meetingId', 'templateId', 'organizationName', 'title', and 'meetingType' are required"}), 400
 
-    if template_id == 1:
-        print("1");
-        create_document_template_1(meeting_id)
-        file_path = f'__temp__/docx/{meeting_id}_1.docx'
-    elif template_id == 2:
-        create_document_template_2(meeting_id)
-        file_path = f'__temp__/docx/{meeting_id}_2.docx'
-    else:
-        return jsonify({"error": "Invalid templateId"}), 400
+    logo_path = None
+    if logo:
+        logo_filename = secure_filename(logo.filename)
+        logo_dir = '__temp__/logos'
+        if not os.path.exists(logo_dir):
+            os.makedirs(logo_dir)
+        logo_path = os.path.join(logo_dir, logo_filename)
+        logo.save(logo_path)
 
-    return send_file(file_path, as_attachment=True)
+    try:
+        if template_id == '1':
+            create_document_template_1(meeting_id, organization_name, title, meeting_type, logo_path)
+            file_path = f'__temp__/docx/{meeting_id}_1.docx'
+        elif template_id == '2':
+            create_document_template_2(meeting_id, organization_name, title, meeting_type, logo_path)
+            file_path = f'__temp__/docx/{meeting_id}_2.docx'
+        else:
+            logging.error("Invalid templateId")
+            return jsonify({"error": "Invalid templateId"}), 400
+
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        logging.error(f"Error generating document: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
     
 
 if __name__ == '__main__':
