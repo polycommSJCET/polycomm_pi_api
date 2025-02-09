@@ -10,6 +10,7 @@ import csv
 import json
 from datetime import datetime
 import pytz
+from docx2pdf import convert
 
 
 # Variable to select the template
@@ -296,6 +297,7 @@ def create_document_template_1(m_id, organization_name, title, meeting_type, log
     footer_para.add_run(' | Confidential').font.size = Pt(8)
 
     doc.save('__temp__/docx/'+m_id+'_1.docx')
+    convert('__temp__/docx/'+m_id+'_1.docx', '__temp__/pdf/'+m_id+'_1.pdf')
 
 
 def create_document_template_2(m_id, organization_name, title, meeting_type, logo_path):
@@ -483,9 +485,10 @@ def create_document_template_2(m_id, organization_name, title, meeting_type, log
     footer_para.add_run(f' | {organization_name}')
 
     doc.save('__temp__/docx/'+m_id+'_2.docx')
+    convert('__temp__/docx/'+m_id+'_2.docx', '__temp__/pdf/'+m_id+'_2.pdf')
 
 
 # if TEMPLATE_SELECTION == 1:
-#     create_document_template_1("sample_meeting")
+#       create_document_template_1("sample_meeting","Growisen","Weekly Meeting","Product development","logo-dark.png")
 # elif TEMPLATE_SELECTION == 2:
 #     create_document_template_2("sample_meeting")
