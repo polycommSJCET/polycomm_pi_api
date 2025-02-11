@@ -1,4 +1,5 @@
 import csv
+import datetime
 from flask import Flask, request, jsonify, send_file
 from googletrans import Translator
 from flask_cors import CORS  
@@ -13,6 +14,9 @@ from werkzeug.utils import secure_filename
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
+
+ANALYTICS_FOLDER = "analytics"
+os.makedirs(ANALYTICS_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -107,6 +111,20 @@ def end_call():
     except Exception as e:
         logging.error(f"Error in end_call: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+    
+    
+    
+@app.route('/call-ended', methods=['POST'])
+def end_call1():
+    try:
+       print("call ended yes from meeting")
+
+    except Exception as e:
+        logging.error(f"Error in end_call: {str(e)}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+    
+    
+
 
 
 
@@ -157,6 +175,41 @@ def generate():
         logging.error(f"Error generating document: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
     
+    
+@app.route('/mic-usage', methods=['POST'])
+def log_mic_usage():
+    try:
+        data = request.get_json()
+        
+        # Extract details from request
+        username = data.get("username")
+        mic_start_time = data.get("mic_start_time")
+        mic_end_time = data.get("mic_end_time")
+        meeting_id = data.get("meeting_id")
+
+        if not all([username, mic_start_time, mic_end_time, meeting_id]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Define CSV file path
+        csv_filename = os.path.join(ANALYTICS_FOLDER, f"{meeting_id}.csv")
+
+        # Check if file exists, if not, write the header
+        file_exists = os.path.isfile(csv_filename)
+        
+        with open(csv_filename, mode="a", newline="") as file:
+            writer = csv.writer(file)
+
+            # Write header if the file is new
+            if not file_exists:
+                writer.writerow(["Username", "Mic Start Time", "Mic End Time", "Timestamp"])
+
+            # Write data
+            writer.writerow([username, mic_start_time, mic_end_time, datetime.utcnow().isoformat()])
+
+        return jsonify({"message": "Mic usage logged successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Load SSL certificate and private key
