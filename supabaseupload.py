@@ -109,6 +109,8 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
 
         # Upload file to storage bucket
         storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/meeting_data.csv"
+        analytics_storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/analytics_data.csv"
+        camera_analytics_storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/camera_analytics_data.csv"
 
         with open(f'__temp__/csv/{meeting_id}.csv', 'rb') as f:
             file_data = f.read()
@@ -129,10 +131,38 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
         logging.debug(f"Storage response text: {storage_response.text}")
         storage_response.raise_for_status()
 
+        # Upload analytics data to storage bucket
+        with open(f'__temp__/analytics/{meeting_id}.csv', 'rb') as f:
+            analytics_file_data = f.read()
+
+        analytics_storage_response = requests.post(
+            analytics_storage_url,
+            headers=upload_headers,
+            data=analytics_file_data
+        )
+        logging.debug(f"Analytics storage response status code: {analytics_storage_response.status_code}")
+        logging.debug(f"Analytics storage response text: {analytics_storage_response.text}")
+        analytics_storage_response.raise_for_status()
+        
+        #camera analytics storage
+        
+        with open(f'__temp__/camera_analytics/{meeting_id}.csv', 'rb') as f:
+            camera_analytics_file_data = f.read()
+
+        camera_analytics_storage_response = requests.post(
+            camera_analytics_storage_url,
+            headers=upload_headers,
+            data=camera_analytics_file_data
+        )
+        logging.debug(f"Camera analytics storage response status code: {camera_analytics_storage_response.status_code}")
+        logging.debug(f"Camera analytics storage response text: {camera_analytics_storage_response.text}")
+        camera_analytics_storage_response.raise_for_status()
+
         return {
             'status': 'success',
             'meeting_id': meeting_id,
-            'storage_path': f'{BUCKET_NAME}/meetings/{meeting_id}/meeting_data.csv'
+            'storage_path': f'{BUCKET_NAME}/meetings/{meeting_id}/meeting_data.csv',
+            'analytics_storage_path': f'{BUCKET_NAME}/analytics/analytics_data.csv'
         }
 
     except requests.exceptions.RequestException as e:
