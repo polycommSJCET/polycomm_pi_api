@@ -1,5 +1,5 @@
 import csv
-import datetime
+
 from flask import Flask, request, jsonify, send_file
 from googletrans import Translator
 from flask_cors import CORS  
@@ -15,8 +15,11 @@ from werkzeug.utils import secure_filename
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-ANALYTICS_FOLDER = "analytics"
+ANALYTICS_FOLDER = "__temp__/analytics"
 os.makedirs(ANALYTICS_FOLDER, exist_ok=True)
+
+CAMERA_ANALYTICS_FOLDER = "__temp__/camera_analytics"
+os.makedirs(CAMERA_ANALYTICS_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -96,8 +99,8 @@ def end_call():
         logging.debug(f"Received data: {data}")
 
         # Generate meeting minutes
-        document = generate_minutes(data.get('m_id'))
-        logging.debug(f"Generated document: {document}")
+        # document = generate_minutes(data.get('m_id'))
+        # logging.debug(f"Generated document: {document}")
 
         # Save meeting data to Supabase
         result = save_meeting_data(data)
@@ -179,36 +182,116 @@ def generate():
 @app.route('/mic-usage', methods=['POST'])
 def log_mic_usage():
     try:
+        # Create analytics folder if it doesn't exist
+        os.makedirs(ANALYTICS_FOLDER, exist_ok=True)
+        
+        # Extract and validate request data
         data = request.get_json()
         
-        # Extract details from request
-        username = data.get("username")
-        mic_start_time = data.get("mic_start_time")
-        mic_end_time = data.get("mic_end_time")
-        meeting_id = data.get("meeting_id")
-
-        if not all([username, mic_start_time, mic_end_time, meeting_id]):
-            return jsonify({"error": "Missing required fields"}), 400
-
+        # Log received data for debugging
+        print(f"Received data: {data}")
+        
+        # Validate required fields
+        required_fields = ["username", "mic_start_time", "mic_end_time", "meeting_id"]
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Extract validated data
+        username = data["username"]
+        mic_start_time = data["mic_start_time"]
+        mic_end_time = data["mic_end_time"]
+        meeting_id = data["meeting_id"]
+        
         # Define CSV file path
         csv_filename = os.path.join(ANALYTICS_FOLDER, f"{meeting_id}.csv")
-
-        # Check if file exists, if not, write the header
+        print(f"Writing to: {csv_filename}")
+        
+        # Check file existence before opening
         file_exists = os.path.isfile(csv_filename)
         
-        with open(csv_filename, mode="a", newline="") as file:
-            writer = csv.writer(file)
-
-            # Write header if the file is new
-            if not file_exists:
-                writer.writerow(["Username", "Mic Start Time", "Mic End Time", "Timestamp"])
-
-            # Write data
-            writer.writerow([username, mic_start_time, mic_end_time, datetime.utcnow().isoformat()])
-
+        try:
+            with open(csv_filename, mode="a", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                
+                # Write header for new files
+                if not file_exists:
+                    writer.writerow(["Username", "Mic Start Time", "Mic End Time"])
+                
+                # Write data row
+                
+                writer.writerow([username, mic_start_time, mic_end_time])
+                
+                # Flush the file to ensure writing
+                file.flush()
+                os.fsync(file.fileno())
+                
+        except IOError as e:
+            print(f"Error writing to file: {e}")
+            return jsonify({"error": f"Failed to write to CSV: {str(e)}"}), 500
+        
         return jsonify({"message": "Mic usage logged successfully"}), 200
-
+        
     except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+    
+@app.route('/camera-usage', methods=['POST'])
+def log_camera_usage():
+    try:
+        # Create analytics folder if it doesn't exist
+        os.makedirs(CAMERA_ANALYTICS_FOLDER, exist_ok=True)
+        
+        # Extract and validate request data
+        data = request.get_json()
+        
+        # Log received data for debugging
+        print(f"Received data: {data}")
+        
+        # Validate required fields
+        required_fields = ["username", "camera_start_time", "camera_end_time", "meeting_id"]
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Extract validated data
+        username = data["username"]
+        camera_start_time = data["camera_start_time"]
+        camera_end_time = data["camera_end_time"]
+        meeting_id = data["meeting_id"]
+        
+        # Define CSV file path
+        csv_filename = os.path.join(CAMERA_ANALYTICS_FOLDER, f"{meeting_id}.csv")
+        print(f"Writing to: {csv_filename}")
+        
+        # Check file existence before opening
+        file_exists = os.path.isfile(csv_filename)
+        
+        try:
+            with open(csv_filename, mode="a", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                
+                # Write header for new files
+                if not file_exists:
+                    writer.writerow(["Username", "Camera Start Time", "Camera End Time"])
+                
+                # Write data row
+                
+                writer.writerow([username, camera_start_time, camera_end_time])
+                
+                # Flush the file to ensure writing
+                file.flush()
+                os.fsync(file.fileno())
+                
+        except IOError as e:
+            print(f"Error writing to file: {e}")
+            return jsonify({"error": f"Failed to write to CSV: {str(e)}"}), 500
+        
+        return jsonify({"message": "Mic usage logged successfully"}), 200
+        
+    except Exception as e:
+        print(f"Unexpected error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
