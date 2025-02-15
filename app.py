@@ -21,6 +21,9 @@ os.makedirs(ANALYTICS_FOLDER, exist_ok=True)
 CAMERA_ANALYTICS_FOLDER = "__temp__/camera_analytics"
 os.makedirs(CAMERA_ANALYTICS_FOLDER, exist_ok=True)
 
+PRESENCE_ANALYTICS_FOLDER = "__temp__/presence_analytics"
+os.makedirs(PRESENCE_ANALYTICS_FOLDER, exist_ok=True)
+
 app = Flask(__name__)
 CORS(app)
 
@@ -290,6 +293,55 @@ def log_camera_usage():
         
         return jsonify({"message": "Mic usage logged successfully"}), 200
         
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+
+@app.route('/log-presence', methods=['POST'])
+def log_prescence():
+    try:
+        # Extract and validate request data
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ["eventTime", "eventType", "userName", "callId"]
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Extract validated data
+        event_time = data["eventTime"]
+        event_type = data["eventType"]
+        user_name = data["userName"]
+        call_id = data["callId"]
+        
+        # Define CSV file path
+        csv_filename = os.path.join(PRESENCE_ANALYTICS_FOLDER, f"{call_id}.csv")
+        
+        # Check file existence before opening
+        file_exists = os.path.isfile(csv_filename)
+        
+        try:
+            with open(csv_filename, mode="a", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                
+                # Write header for new files
+                if not file_exists:
+                    writer.writerow(["Event Time", "Event Type", "User Name"])
+                
+                # Write data row
+                writer.writerow([event_time, event_type, user_name])
+                
+                # Flush the file to ensure writing
+                file.flush()
+                os.fsync(file.fileno())
+                
+        except IOError as e:
+            print(f"Error writing to file: {e}")
+            return jsonify({"error": f"Failed to write to CSV: {str(e)}"}), 500
+    
+        return jsonify({"message": "User presence logged successfully"}), 200
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": str(e)}), 500

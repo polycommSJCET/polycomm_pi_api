@@ -111,58 +111,92 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
         storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/meeting_data.csv"
         analytics_storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/analytics_data.csv"
         camera_analytics_storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/camera_analytics_data.csv"
-
-        with open(f'__temp__/csv/{meeting_id}.csv', 'rb') as f:
-            file_data = f.read()
+        presence_analytics_storage_url = f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/presence_analytics_data.csv"
 
         upload_headers = {
-            'apikey': supabase_key,
-            'Authorization': f'Bearer {supabase_key}',
-            'Content-Type': 'text/csv',
-            'Cache-Control': '3600'
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "text/csv",  # Set MIME type if known
         }
 
-        storage_response = requests.post(
-            storage_url,
-            headers=upload_headers,
-            data=file_data
-        )
-        logging.debug(f"Storage response status code: {storage_response.status_code}")
-        logging.debug(f"Storage response text: {storage_response.text}")
-        storage_response.raise_for_status()
+        upload_results = {
+            'meeting_data': False,
+            'analytics_data': False,
+            'camera_analytics': False,
+            'presence_analytics': False
+        }
 
-        # Upload analytics data to storage bucket
-        with open(f'__temp__/analytics/{meeting_id}.csv', 'rb') as f:
-            analytics_file_data = f.read()
+        # Meeting data upload
+        try:
+            with open(f'__temp__/csv/{meeting_id}.csv', 'rb') as f:
+                file_data = f.read()
+                storage_response = requests.post(
+                    storage_url,
+                    headers=upload_headers,
+                    data=file_data
+                )
+                storage_response.raise_for_status()
+                upload_results['meeting_data'] = True
+        except FileNotFoundError:
+            logging.warning(f"Meeting data file not found for meeting {meeting_id}")
+        except Exception as e:
+            logging.error(f"Error uploading meeting data: {str(e)}")
 
-        analytics_storage_response = requests.post(
-            analytics_storage_url,
-            headers=upload_headers,
-            data=analytics_file_data
-        )
-        logging.debug(f"Analytics storage response status code: {analytics_storage_response.status_code}")
-        logging.debug(f"Analytics storage response text: {analytics_storage_response.text}")
-        analytics_storage_response.raise_for_status()
-        
-        #camera analytics storage
-        
-        with open(f'__temp__/camera_analytics/{meeting_id}.csv', 'rb') as f:
-            camera_analytics_file_data = f.read()
+        # Analytics data upload
+        try:
+            with open(f'__temp__/analytics/{meeting_id}.csv', 'rb') as f:
+                analytics_file_data = f.read()
+                analytics_storage_response = requests.post(
+                    analytics_storage_url,
+                    headers=upload_headers,
+                    data=analytics_file_data
+                )
+                analytics_storage_response.raise_for_status()
+                upload_results['analytics_data'] = True
+        except FileNotFoundError:
+            logging.warning(f"Analytics data file not found for meeting {meeting_id}")
+        except Exception as e:
+            logging.error(f"Error uploading analytics data: {str(e)}")
 
-        camera_analytics_storage_response = requests.post(
-            camera_analytics_storage_url,
-            headers=upload_headers,
-            data=camera_analytics_file_data
-        )
-        logging.debug(f"Camera analytics storage response status code: {camera_analytics_storage_response.status_code}")
-        logging.debug(f"Camera analytics storage response text: {camera_analytics_storage_response.text}")
-        camera_analytics_storage_response.raise_for_status()
+        # Camera analytics upload
+        try:
+            with open(f'__temp__/camera_analytics/{meeting_id}.csv', 'rb') as f:
+                camera_analytics_file_data = f.read()
+                camera_analytics_storage_response = requests.post(
+                    camera_analytics_storage_url,
+                    headers=upload_headers,
+                    data=camera_analytics_file_data
+                )
+                camera_analytics_storage_response.raise_for_status()
+                upload_results['camera_analytics'] = True
+        except FileNotFoundError:
+            logging.warning(f"Camera analytics file not found for meeting {meeting_id}")
+        except Exception as e:
+            logging.error(f"Error uploading camera analytics data: {str(e)}")
+
+        # Presence analytics upload
+        try:
+            with open(f'__temp__/presence_analytics/{meeting_id}.csv', 'rb') as f:
+                presence_analytics_file_data = f.read()
+                presence_analytics_storage_response = requests.post(
+                    presence_analytics_storage_url,
+                    headers=upload_headers,
+                    data=presence_analytics_file_data
+                )
+                presence_analytics_storage_response.raise_for_status()
+                upload_results['presence_analytics'] = True
+        except FileNotFoundError:
+            logging.warning(f"Presence analytics file not found for meeting {meeting_id}")
+        except Exception as e:
+            logging.error(f"Error uploading presence analytics data: {str(e)}")
+
+        # Check if at least one file was uploaded successfully
+        if not any(upload_results.values()):
+            raise Exception("No files were uploaded successfully")
 
         return {
-            'status': 'success',
+            'status': 'partial_success' if not all(upload_results.values()) else 'success',
             'meeting_id': meeting_id,
-            'storage_path': f'{BUCKET_NAME}/meetings/{meeting_id}/meeting_data.csv',
-            'analytics_storage_path': f'{BUCKET_NAME}/analytics/analytics_data.csv'
+            'upload_results': upload_results
         }
 
     except requests.exceptions.RequestException as e:
