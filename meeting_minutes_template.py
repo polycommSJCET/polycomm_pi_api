@@ -371,8 +371,8 @@ def create_document_template_2(m_id, organization_name, title, meeting_type, log
 
     format = """ [
         ('Participants', [
-            ('Present', 'Names of present attendees'),
-            ('Absent', 'Names of absent attendees'),
+            ('Present', ['Person 1','Person 2']),
+            ('Absent', ['Person 1','Person 2']),
         ]),
         ('Key Discussion Points', [
             ('Topic 1', [
