@@ -58,15 +58,18 @@ def save_meeting_data(meeting_data, supabase_url=SUPABASE_URL, supabase_key=SUPA
         call_ended_by = meeting_data.get('callended', {})
         meeting_id = meeting_data.get('m_id')
         call_start_time_str = call_ended_by.get('callStartTime')
+        call_end_time_str = call_ended_by.get('callEndTime')
         
         # Parse the start time and convert it to IST
         call_start_time_utc = datetime.datetime.fromisoformat(call_start_time_str)
+        call_end_time_utc = datetime.datetime.fromisoformat(call_end_time_str)
         ist = pytz.timezone('Asia/Kolkata')
         call_start_time_ist = call_start_time_utc.astimezone(ist)
+        call_end_time_ist = call_end_time_utc.astimezone(ist)
 
         # Get the current time in IST
-        call_end_time_utc = datetime.datetime.now(datetime.timezone.utc)
-        call_end_time_ist = call_end_time_utc.astimezone(ist)
+        # call_end_time_utc = datetime.datetime.now(datetime.timezone.utc)
+        # call_end_time_ist = call_end_time_utc.astimezone(ist)
         duration_seconds = (call_end_time_ist - call_start_time_ist).total_seconds()
 
         # Calculate duration in hours and minutes
