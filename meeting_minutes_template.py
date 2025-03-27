@@ -83,7 +83,11 @@ def parse_llm_response(response_text):
     try:
         # Try using ast.literal_eval if possible
         return ast.literal_eval(response_text)
-    except (SyntaxError, ValueError):
+    except (SyntaxError, ValueError) as e:
+        # Log the specific error
+        print(f"Error parsing LLM response with ast.literal_eval: {str(e)}")
+        print(f"Problematic response text: {response_text[:500]}...")  # Show first 500 chars
+        
         # Fallback to regex-based parsing for template 1 format
         import re
         
@@ -111,7 +115,52 @@ def parse_llm_response(response_text):
             
             sections.append((section_title, subsections))
         
+        # If we couldn't find any sections using regex, create a default structure
+        if not sections:
+            print("Fallback to default template structure due to parsing failure")
+            # Create a basic template structure for error cases
+            return [
+                ('1. Meeting Summary', [
+                    ('Overview', 'The meeting transcript could not be properly parsed. Please check the original recording.'),
+                    ('Technical Note', 'There was an issue processing the LLM response for this meeting.')
+                ]),
+                ('2. Raw Transcript', [
+                    ('Transcript Data', 'The raw meeting transcript is available in the system but could not be formatted properly.')
+                ])
+            ]
+            
         return sections
+
+
+def extract_llm_content(response):
+    """Extract and clean the content from LLM response stream."""
+    message_content = []
+    
+    for line in response.iter_lines():
+        if line:  # Ignore empty lines
+            try:
+                # Parse the line as JSON
+                data = json.loads(line)
+                # Append content if the "message" key exists
+                if "message" in data and "content" in data["message"]:
+                    message_content.append(data["message"]["content"])
+            except json.JSONDecodeError as e:
+                print(f"Failed to decode line: {str(e)}")
+                print(f"Problematic line: {line[:200]}...")  # Show first 200 chars
+
+    # Combine all message parts into the final response
+    final_message = "".join(message_content)
+    
+    # Extract the JSON array part from the message
+    start = final_message.find('[')
+    end = final_message.rfind(']') + 1
+    
+    if start >= 0 and end > 0 and start < end:
+        return final_message[start:end]
+    else:
+        print(f"Could not find valid JSON array in response")
+        # Return a basic empty array as fallback
+        return "[]"
 
 
 def create_document_template_1(m_id, organization_name, title, meeting_type, logo_path):
@@ -212,93 +261,78 @@ def create_document_template_1(m_id, organization_name, title, meeting_type, log
 
         file_input=''
 
-        with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
-            csv_reader = csv.reader(file)
-                
-            for row in csv_reader:
-                file_input += ", ".join(row) + "\n"
+        try:
+            with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
+                csv_reader = csv.reader(file)
+                    
+                for row in csv_reader:
+                    file_input += ", ".join(row) + "\n"
+        except Exception as e:
+            print(f"Error reading CSV file: {str(e)}")
+            file_input = "No transcript data available for this meeting."
 
-        response = requests.post(
-            'http://localhost:11434/api/chat',
-            json={
-                "model": "llama3.2",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": """Generate detailed meeting minutes in paragraph form and reply in the following format. Ensure the reply is parsable with Python. Include only available data and make each section unique with real content from the conversation:
-        [
-            ('1. Meeting Overview', [
-                ('Purpose', 'Detailed paragraph describing the meeting purpose, context, and background.'),        
-                ('Agenda Items', 'Comprehensive paragraph outlining all key agenda items discussed in the meeting.')
-            ]),
-            ('2. Attendees', [
-                ('Present', 'Detailed paragraph listing all attendees present at the meeting with their roles if mentioned.'), 
-                ('Apologies', 'Paragraph noting those who sent apologies with any context provided.'),
-                ('Absent', 'Paragraph mentioning those absent without prior notice if applicable.')
-            ]),
-            ('3. Discussion Points', [
-                ('Key Points Discussed',
-                    'Detailed paragraph covering the first major topic discussed, including all viewpoints presented, questions raised, and information shared.\\n\\n' 
-                    'Comprehensive paragraph about the second topic, elaborating on all details mentioned during the discussion.\\n\\n'  
-                    'Thorough paragraph concerning the third major point, capturing the essence of the conversation with specific details mentioned.'),
-                ('Decisions Made',
-                    'Detailed paragraph explaining all decisions reached during the meeting, including the reasoning and any objections raised.'),
-                ('Voting Results',
-                    'Comprehensive paragraph describing any voting that took place, including counts, abstentions, and final outcome.')
-            ]),
-            ('4. Action Items', [
-                ('Tasks Assigned',
-                    'Detailed paragraph outlining all tasks assigned during the meeting, specifying who is responsible for each.'),
-                ('Responsibilities',
-                    'Comprehensive paragraph detailing the specific responsibilities assigned to each individual or team.'),
-                ('Deadlines',
-                    'Thorough paragraph specifying all timelines and deadlines agreed upon for the completion of assigned tasks.')
-            ]),
-            ('5. Next Meeting', [
-                ('Date and Time',
-                    'Paragraph confirming the date, time, and location of the next scheduled meeting.'),
-                ('Preliminary Agenda',
-                    'Detailed paragraph outlining topics to be discussed in the next meeting based on current outcomes and ongoing items.')
-            ])
-        ]"""
-                    },
-                    {
-                        "role": "user",
-                        "content": "Generate detailed meeting minutes based on the following conversation. Extract real information for each section in well-written paragraphs. Identify actual attendees, discussion points, action items, and any mentions of future meetings: "+file_input
-                    }
-                ]
-            },
-            stream=True  # Enable streaming
-        )
-
-        message_content = []
-
-        for line in response.iter_lines():
-            if line:  # Ignore empty lines
-                try:
-                    # Parse the line as JSON
-                    data = json.loads(line)
-                    # Append content if the "message" key exists
-                    if "message" in data and "content" in data["message"]:
-                        message_content.append(data["message"]["content"])
-                except json.JSONDecodeError:
-                    print("Failed to decode line:", line)
-
-        # Combine all message parts into the final response
-        final_message = "".join(message_content)
-
-        # Print the complete response from the LLM model
-        print("\n===== TEMPLATE 1 LLM RESPONSE BEGIN =====")
-        print(final_message)
-        print("===== TEMPLATE 1 LLM RESPONSE END =====\n")
-
-        # Extract the JSON array from the message
-        start = final_message.find('[')
-        end = final_message.rfind(']') + 1
-        if start >= 0 and end > 0:
-            final_message = final_message[start:end]
-        else:
-            print(f"Could not find valid JSON array in: {final_message}")
+        try:
+            response = requests.post(
+                'http://localhost:11434/api/chat',
+                json={
+                    "model": "llama3.2",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": """Generate detailed meeting minutes in paragraph form and reply in the following format. Ensure the reply is parsable with Python. Include only available data and make each section unique with real content from the conversation:
+            [
+                ('1. Meeting Overview', [
+                    ('Purpose', 'Detailed paragraph describing the meeting purpose, context, and background.'),        
+                    ('Agenda Items', 'Comprehensive paragraph outlining all key agenda items discussed in the meeting.')
+                ]),
+                ('2. Attendees', [
+                    ('Present', 'Detailed paragraph listing all attendees present at the meeting with their roles if mentioned.'), 
+                    ('Apologies', 'Paragraph noting those who sent apologies with any context provided.'),
+                    ('Absent', 'Paragraph mentioning those absent without prior notice if applicable.')
+                ]),
+                ('3. Discussion Points', [
+                    ('Key Points Discussed',
+                        'Detailed paragraph covering the first major topic discussed, including all viewpoints presented, questions raised, and information shared.\\n\\n' 
+                        'Comprehensive paragraph about the second topic, elaborating on all details mentioned during the discussion.\\n\\n'  
+                        'Thorough paragraph concerning the third major point, capturing the essence of the conversation with specific details mentioned.'),
+                    ('Decisions Made',
+                        'Detailed paragraph explaining all decisions reached during the meeting, including the reasoning and any objections raised.'),
+                    ('Voting Results',
+                        'Comprehensive paragraph describing any voting that took place, including counts, abstentions, and final outcome.')
+                ]),
+                ('4. Action Items', [
+                    ('Tasks Assigned',
+                        'Detailed paragraph outlining all tasks assigned during the meeting, specifying who is responsible for each.'),
+                    ('Responsibilities',
+                        'Comprehensive paragraph detailing the specific responsibilities assigned to each individual or team.'),
+                    ('Deadlines',
+                        'Thorough paragraph specifying all timelines and deadlines agreed upon for the completion of assigned tasks.')
+                ]),
+                ('5. Next Meeting', [
+                    ('Date and Time',
+                        'Paragraph confirming the date, time, and location of the next scheduled meeting.'),
+                    ('Preliminary Agenda',
+                        'Detailed paragraph outlining topics to be discussed in the next meeting based on current outcomes and ongoing items.')
+                ])
+            ]"""
+                        },
+                        {
+                            "role": "user",
+                            "content": "Generate detailed meeting minutes based on the following conversation. Extract real information for each section in well-written paragraphs. Identify actual attendees, discussion points, action items, and any mentions of future meetings: "+file_input
+                        }
+                    ]
+                },
+                stream=True,
+                timeout=60  # Set a reasonable timeout
+            )
+            
+            # Check if the response status is successful
+            response.raise_for_status()
+            
+            final_message = extract_llm_content(response)
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error making request to LLM: {str(e)}")
             final_message = "[]"  # Default empty array
 
         # Parse the response
@@ -373,7 +407,10 @@ def create_document_template_1(m_id, organization_name, title, meeting_type, log
         footer_para.add_run(' | Confidential').font.size = Pt(8)
 
         doc.save('__temp__/docx/'+m_id+'_1.docx')
-        convert('__temp__/docx/'+m_id+'_1.docx', '__temp__/pdf/'+m_id+'_1.pdf')
+        try:
+            convert('__temp__/docx/'+m_id+'_1.docx', '__temp__/pdf/'+m_id+'_1.pdf')
+        except Exception as pdf_error:
+            print(f"Error converting to PDF: {str(pdf_error)}")
     finally:
         pythoncom.CoUninitialize()
 
@@ -481,57 +518,45 @@ def create_document_template_2(m_id, organization_name, title, meeting_type, log
 
         file_input=''
 
-        with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
-            csv_reader = csv.reader(file)
-                
-            for row in csv_reader:
-                file_input += ", ".join(row) + "\n"
+        try:
+            with open('__temp__/csv/'+m_id+'.csv', mode='r') as file:
+                csv_reader = csv.reader(file)
+                    
+                for row in csv_reader:
+                    file_input += ", ".join(row) + "\n"
+        except Exception as e:
+            print(f"Error reading CSV file: {str(e)}")
+            file_input = "No transcript data available for this meeting."
 
-        response = requests.post(
-            'http://localhost:11434/api/chat',
-            json={
-                "model": "llama3.2",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": """Generate meeting minutes and reply in the following format. Ensure the reply is parsable with ast.literal_eval(). Extract different, real information for each section. Include actual attendees, specific discussion topics with distinct points, and varied action items with different priorities:
-                        """+format
-                    },
-                    {
-                        "role": "user",
-                        "content": "Generate meeting minutes based on the following conversation. Extract real information for each section. Identify actual attendees, distinct discussion topics, action items with varying priorities: "+file_input
-                    }
-                ]
-            },
-            stream=True  # Enable streaming
-        )
-
-        message_content = []
-
-        for line in response.iter_lines():
-
-            if line:  # Ignore empty lines
-                try:
-                    # Parse the line as JSON
-                    #print(line)
-                    data = json.loads(line)
-                    # Append content if the "message" key exists
-                    if "message" in data and "content" in data["message"]:
-                        message_content.append(data["message"]["content"])
-                except json.JSONDecodeError:
-                    print("Failed to decode line:", line)
-
-        # Combine all message parts into the final response
-        final_message = """""".join(message_content)
-
-        # Print the complete response from the LLM model
-        print("\n===== TEMPLATE 2 LLM RESPONSE BEGIN =====")
-        print(final_message)
-        print("===== TEMPLATE 2 LLM RESPONSE END =====\n")
-
-        start = final_message.find('[')
-        end = final_message.rfind(']') + 1
-        final_message = final_message[start:end]
+        try:
+            response = requests.post(
+                'http://localhost:11434/api/chat',
+                json={
+                    "model": "llama3.2",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": """Generate meeting minutes and reply in the following format. Ensure the reply is parsable with ast.literal_eval(). Extract different, real information for each section. Include actual attendees, specific discussion topics with distinct points, and varied action items with different priorities:
+                            """+format
+                        },
+                        {
+                            "role": "user",
+                            "content": "Generate meeting minutes based on the following conversation. Extract real information for each section. Identify actual attendees, distinct discussion topics, action items with varying priorities: "+file_input
+                        }
+                    ]
+                },
+                stream=True,
+                timeout=60  # Set a reasonable timeout
+            )
+            
+            # Check if the response status is successful
+            response.raise_for_status()
+            
+            final_message = extract_llm_content(response)
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error making request to LLM: {str(e)}")
+            final_message = "[]"  # Default empty array
 
         # Ensure the content is correctly parsed and added to the document
         try:
