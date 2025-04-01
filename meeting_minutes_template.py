@@ -279,42 +279,51 @@ def create_document_template_1(m_id, organization_name, title, meeting_type, log
                     "messages": [
                         {
                             "role": "system",
-                            "content": """Generate detailed meeting minutes in paragraph form and reply in the following format. Ensure the reply is parsable with Python. Include only available data and make each section unique with real content from the conversation:
-            [
-                ('1. Meeting Overview', [
-                    ('Purpose', 'Detailed paragraph describing the meeting purpose, context, and background.'),        
-                    ('Agenda Items', 'Comprehensive paragraph outlining all key agenda items discussed in the meeting.')
-                ]),
-                ('2. Attendees', [
-                    ('Present', 'Detailed paragraph listing all attendees present at the meeting with their roles if mentioned.'), 
-                    ('Apologies', 'Paragraph noting those who sent apologies with any context provided.'),
-                    ('Absent', 'Paragraph mentioning those absent without prior notice if applicable.')
-                ]),
-                ('3. Discussion Points', [
-                    ('Key Points Discussed',
-                        'Detailed paragraph covering the first major topic discussed, including all viewpoints presented, questions raised, and information shared.\\n\\n' 
-                        'Comprehensive paragraph about the second topic, elaborating on all details mentioned during the discussion.\\n\\n'  
-                        'Thorough paragraph concerning the third major point, capturing the essence of the conversation with specific details mentioned.'),
-                    ('Decisions Made',
-                        'Detailed paragraph explaining all decisions reached during the meeting, including the reasoning and any objections raised.'),
-                    ('Voting Results',
-                        'Comprehensive paragraph describing any voting that took place, including counts, abstentions, and final outcome.')
-                ]),
-                ('4. Action Items', [
-                    ('Tasks Assigned',
-                        'Detailed paragraph outlining all tasks assigned during the meeting, specifying who is responsible for each.'),
-                    ('Responsibilities',
-                        'Comprehensive paragraph detailing the specific responsibilities assigned to each individual or team.'),
-                    ('Deadlines',
-                        'Thorough paragraph specifying all timelines and deadlines agreed upon for the completion of assigned tasks.')
-                ]),
-                ('5. Next Meeting', [
-                    ('Date and Time',
-                        'Paragraph confirming the date, time, and location of the next scheduled meeting.'),
-                    ('Preliminary Agenda',
-                        'Detailed paragraph outlining topics to be discussed in the next meeting based on current outcomes and ongoing items.')
-                ])
-            ]"""
+                            "content": """You are tasked with generating detailed meeting minutes in a strictly formatted structure. Your response MUST be a valid Python list that can be parsed with ast.literal_eval(). 
+
+Follow this exact format with no deviations:
+[
+    ('1. Meeting Overview', [
+        ('Purpose', 'Detailed paragraph describing the meeting purpose, context, and background.'),        
+        ('Agenda Items', 'Comprehensive paragraph outlining all key agenda items discussed in the meeting.')
+    ]),
+    ('2. Attendees', [
+        ('Present', 'Detailed paragraph listing all attendees present at the meeting with their roles if mentioned.'), 
+        ('Apologies', 'Paragraph noting those who sent apologies with any context provided.'),
+        ('Absent', 'Paragraph mentioning those absent without prior notice if applicable.')
+    ]),
+    ('3. Discussion Points', [
+        ('Key Points Discussed',
+            'Detailed paragraph covering the first major topic discussed, including all viewpoints presented, questions raised, and information shared.\\n\\n' 
+            'Comprehensive paragraph about the second topic, elaborating on all details mentioned during the discussion.\\n\\n'  
+            'Thorough paragraph concerning the third major point, capturing the essence of the conversation with specific details mentioned.'),
+        ('Decisions Made',
+            'Detailed paragraph explaining all decisions reached during the meeting, including the reasoning and any objections raised.'),
+        ('Voting Results',
+            'Comprehensive paragraph describing any voting that took place, including counts, abstentions, and final outcome.')
+    ]),
+    ('4. Action Items', [
+        ('Tasks Assigned',
+            'Detailed paragraph outlining all tasks assigned during the meeting, specifying who is responsible for each.'),
+        ('Responsibilities',
+            'Comprehensive paragraph detailing the specific responsibilities assigned to each individual or team.'),
+        ('Deadlines',
+            'Thorough paragraph specifying all timelines and deadlines agreed upon for the completion of assigned tasks.')
+    ]),
+    ('5. Next Meeting', [
+        ('Date and Time',
+            'Paragraph confirming the date, time, and location of the next scheduled meeting.'),
+        ('Preliminary Agenda',
+            'Detailed paragraph outlining topics to be discussed in the next meeting based on current outcomes and ongoing items.')
+    ])
+]
+
+Remember:
+1. Your ENTIRE response must be ONLY this Python list format - nothing before, nothing after
+2. All text must be properly escaped for Python strings
+3. Do not add explanations or notes outside the list structure
+4. Use only single quotes for string literals, not double quotes
+5. Do not use unmatched quotes within the content"""
                         },
                         {
                             "role": "user",
@@ -536,8 +545,46 @@ def create_document_template_2(m_id, organization_name, title, meeting_type, log
                     "messages": [
                         {
                             "role": "system",
-                            "content": """Generate meeting minutes and reply in the following format. Ensure the reply is parsable with ast.literal_eval(). Extract different, real information for each section. Include actual attendees, specific discussion topics with distinct points, and varied action items with different priorities:
-                            """+format
+                            "content": """You are tasked with generating meeting minutes in a strictly formatted structure. Your response MUST be a valid Python list that can be parsed with ast.literal_eval(). 
+
+Follow this exact format with no deviations:
+[
+    ('Participants', [
+        ('Present', ['Person 1','Person 2','Person 3']),
+        ('Absent', ['Person 4','Person 5']),
+    ]),
+    ('Key Discussion Points', [
+        ('Topic 1', [
+            '• Point 1 about Topic 1',
+            '• Point 2 about Topic 1',
+            '• Point 3 about Topic 1'
+        ]),
+        ('Topic 2', [
+            '• Point 1 about Topic 2',
+            '• Point 2 about Topic 2',
+            '• Point 3 about Topic 2'
+        ])
+    ]),
+    ('Action Items', [
+        ('High Priority', [
+            '→ Item 1 (Person assigned, Date)',
+            '→ Item 2 (Person assigned, Date)',
+            '→ Item 3 (Person assigned, Date)'
+        ]),
+        ('Medium Priority', [
+            '→ Item 1 (Person assigned, Date)',
+            '→ Item 2 (Person assigned, Date)'
+        ])
+    ])
+]
+
+Remember:
+1. Your ENTIRE response must be ONLY this Python list format - nothing before, nothing after
+2. All text must be properly escaped for Python strings
+3. Do not add explanations or notes outside the list structure
+4. Use only single quotes for string literals, not double quotes
+5. Ensure all brackets, parentheses, and quotes are properly matched
+6. Do not insert markdown, timestamps, dates, or any other formatting outside this structure"""
                         },
                         {
                             "role": "user",
