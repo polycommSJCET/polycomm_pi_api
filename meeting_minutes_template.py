@@ -21,6 +21,48 @@ SUPABASE_URL = "https://iljsvpxoiwnwxtjxypgi.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsanN2cHhvaXdud3h0anh5cGdpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODk5NzYwMiwiZXhwIjoyMDU0NTczNjAyfQ.yHQOgRkEGo_NvJeT6ikONQQLiIhcuVVdsNcjZJE_9Rg"  # Use the service role key for secure upload
 BUCKET_NAME = "Polycomm"  
 
+def upload_documents_to_supabase(meeting_id, document_paths):
+    """
+    Upload generated meeting documents to Supabase storage bucket
+    
+    Args:
+        meeting_id (str): The meeting ID
+        document_paths (list): List of tuples containing (file_path, file_name)
+    
+    Returns:
+        dict: Upload results with success status for each file
+    """
+    import logging
+    
+    upload_results = {}
+    
+    # Setup headers for Supabase storage API
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/octet-stream",
+    }
+    
+    for file_path, file_name in document_paths:
+        storage_url = f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/meetings/{meeting_id}/documents/{file_name}"
+        
+        try:
+            with open(file_path, 'rb') as file_data:
+                storage_response = requests.post(
+                    storage_url,
+                    headers=headers,
+                    data=file_data
+                )
+                storage_response.raise_for_status()
+                upload_results[file_name] = True
+                print(f"Successfully uploaded {file_name} to Supabase")
+        except FileNotFoundError:
+            logging.warning(f"Document file not found: {file_path}")
+            upload_results[file_name] = False
+        except Exception as e:
+            logging.error(f"Error uploading document {file_name}: {str(e)}")
+            upload_results[file_name] = False
+    
+    return upload_results
 
 def create_element(name):
     return OxmlElement(name)
@@ -415,9 +457,22 @@ Remember:
         create_page_number(footer_para)
         footer_para.add_run(' | Confidential').font.size = Pt(8)
 
-        doc.save('__temp__/docx/'+m_id+'_1.docx')
+        docx_path = '__temp__/docx/'+m_id+'_1.docx'
+        pdf_path = '__temp__/pdf/'+m_id+'_1.pdf'
+        
+        doc.save(docx_path)
+        print("trying")
         try:
-            convert('__temp__/docx/'+m_id+'_1.docx', '__temp__/pdf/'+m_id+'_1.pdf')
+            convert(docx_path, pdf_path)
+            print(f"Successfully created PDF for meeting {m_id} using template 1")
+            
+            # Upload the generated files to Supabase
+            document_paths = [
+                (docx_path, f"{m_id}_minutes.docx"),
+                (pdf_path, f"{m_id}_minutes.pdf")
+            ]
+            upload_results = upload_documents_to_supabase(m_id, document_paths)
+            print(f"Upload results for template 1 documents: {upload_results}")
         except Exception as pdf_error:
             print(f"Error converting to PDF: {str(pdf_error)}")
     finally:
@@ -674,14 +729,24 @@ Remember:
         footer_para.add_run(f' | {organization_name}')
 
         # Save document and convert to PDF in one block with proper error handling
-        output_docx = f'__temp__/docx/{m_id}_2.docx'
-        output_pdf = f'__temp__/pdf/{m_id}_2.pdf'
+        docx_path = f'__temp__/docx/{m_id}_2.docx'
+        pdf_path = f'__temp__/pdf/{m_id}_2.pdf'
         
         try:
-            doc.save(output_docx)
-            convert(output_docx, output_pdf)
+            doc.save(docx_path)
+            convert(docx_path, pdf_path)
+            print(f"Successfully created PDF for meeting {m_id} using template 2")
+            
+            # Upload the generated files to Supabase
+            document_paths = [
+                (docx_path, f"{m_id}_minutes.docx"),
+                (pdf_path, f"{m_id}_minutes.pdf")
+            ]
+            upload_results = upload_documents_to_supabase(m_id, document_paths)
+            print(f"Upload results for template 2 documents: {upload_results}")
+            
         except Exception as e:
-            print(f"Error saving documents: {e}")
+            print(f"Error saving or uploading documents: {e}")
     finally:
         pythoncom.CoUninitialize()
 
