@@ -47,7 +47,7 @@ def upload_documents_to_supabase(meeting_id, document_paths):
         
         try:
             with open(file_path, 'rb') as file_data:
-                storage_response = requests.post(
+                storage_response = requests.put(
                     storage_url,
                     headers=headers,
                     data=file_data

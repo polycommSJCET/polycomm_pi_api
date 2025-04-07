@@ -11,6 +11,7 @@ import ssl
 import logging
 from meeting_minutes_template import create_document_template_1, create_document_template_2
 from werkzeug.utils import secure_filename
+from minutes import clear_duplicates
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,6 +29,9 @@ app = Flask(__name__)
 CORS(app)
 
 translator = Translator()
+
+
+
 def handle_meeting_file(meeting_id, data):
     # Define the file name based on meeting_id
     file_name = f"__temp__/csv/{meeting_id}.csv"
@@ -100,6 +104,8 @@ def end_call():
     try:
         data = request.get_json()
         logging.debug(f"Received data: {data}")
+
+        clear_duplicates(data.get('m_id'))
 
         # Generate meeting minutes
         # document = generate_minutes(data.get('m_id'))
@@ -365,3 +371,5 @@ if __name__ == '__main__':
         print(f"Warning: {str(e)} Running in HTTP mode (not recommended for production)")
         # Fallback to HTTP (development only)
         app.run(host='0.0.0.0', port=5000)
+
+
